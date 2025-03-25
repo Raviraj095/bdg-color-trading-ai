@@ -25,12 +25,16 @@
             width: 80%;
         }
 
-        .device-info, .authorized-list {
+        .device-info, .authorized-list, .denied-list {
             margin-top: 20px;
         }
 
         .device-entry {
             margin: 5px 0;
+        }
+
+        .pending {
+            color: yellow;
         }
     </style>
 </head>
@@ -39,87 +43,137 @@
     <h1>Device Authorization Panel</h1>
 
     <!-- Current Device Information -->
-    <div class="device-info" id="deviceInfo">Loading your device info...</div>
-    <button onclick="authorizeDevice()">Authorize This Device</button>
+    <div class="device-info" id="deviceInfo">Loading device info...</div>
 
-    <!-- Manual Device Authorization -->
-    <h2>Add Another Device</h2>
-    <input type="text" id="manualDeviceInput" placeholder="Enter Device Identifier (User-Agent)">
-    <button onclick="authorizeManualDevice()">Authorize Device</button>
+    <!-- Pending Devices -->
+    <h2>Pending Device Access</h2>
+    <div id="pendingDevices">No pending requests.</div>
 
     <!-- Authorized Devices List -->
     <h2>Authorized Devices</h2>
     <div class="authorized-list" id="authorizedList">No devices authorized yet.</div>
 
+    <!-- Denied Devices List -->
+    <h2>Denied Devices</h2>
+    <div class="denied-list" id="deniedList">No devices denied yet.</div>
+
     <script>
-        // Get Current Device Identifier (Simplified for matching)
+        // Get Current Device Identifier
         function getDeviceIdentifier() {
             return `${navigator.platform} | ${navigator.userAgent}`;
         }
 
-        // Display Current Device Info
+        // Display Device Info
         function displayCurrentDevice() {
             document.getElementById('deviceInfo').textContent = `Your Device: ${getDeviceIdentifier()}`;
         }
 
-        // Fetch and Display Authorized Devices
-        function updateAuthorizedList() {
-            const authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
-            const listElement = document.getElementById('authorizedList');
-            
-            if (authorizedDevices.length === 0) {
-                listElement.innerHTML = 'No devices authorized yet.';
-            } else {
-                listElement.innerHTML = authorizedDevices.map((device, index) =>
-                    `<div class="device-entry">
-                        ${device} 
-                        <button onclick="removeDevice(${index})">❌ Remove</button>
-                    </div>`).join('');
+        // Fetch Stored Devices
+        function getStoredDevices(key) {
+            return JSON.parse(localStorage.getItem(key)) || [];
+        }
+
+        // Store Devices
+        function storeDevices(key, devices) {
+            localStorage.setItem(key, JSON.stringify(devices));
+        }
+
+        // Display Authorized and Denied Lists
+        function updateDeviceLists() {
+            const authorizedDevices = getStoredDevices('approvedDevices');
+            const deniedDevices = getStoredDevices('deniedDevices');
+
+            const authorizedList = document.getElementById('authorizedList');
+            const deniedList = document.getElementById('deniedList');
+
+            authorizedList.innerHTML = authorizedDevices.length
+                ? authorizedDevices.map(device => `<div class="device-entry">${device}</div>`).join('')
+                : 'No devices authorized yet.';
+
+            deniedList.innerHTML = deniedDevices.length
+                ? deniedDevices.map(device => `<div class="device-entry">${device}</div>`).join('')
+                : 'No devices denied yet.';
+        }
+
+        // Add Device to Authorization Queue
+        function requestDeviceAccess(device) {
+            let pendingDevices = getStoredDevices('pendingDevices');
+
+            if (!pendingDevices.includes(device)) {
+                pendingDevices.push(device);
+                storeDevices('pendingDevices', pendingDevices);
+                displayPendingDevices();
             }
         }
 
-        // Authorize Current Device
-        function authorizeDevice() {
-            const currentDevice = getDeviceIdentifier();
-            addDevice(currentDevice);
-        }
+        // Display Pending Devices for Authorization
+        function displayPendingDevices() {
+            const pendingDevices = getStoredDevices('pendingDevices');
+            const pendingList = document.getElementById('pendingDevices');
 
-        // Authorize Device Manually
-        function authorizeManualDevice() {
-            const manualDevice = document.getElementById('manualDeviceInput').value.trim();
-            if (manualDevice) {
-                addDevice(manualDevice);
-                document.getElementById('manualDeviceInput').value = '';
-            } else {
-                alert('Please enter a valid device identifier.');
+            if (pendingDevices.length === 0) {
+                pendingList.innerHTML = 'No pending requests.';
+                return;
             }
+
+            pendingList.innerHTML = pendingDevices.map((device, index) =>
+                `<div class="device-entry pending">
+                    ${device}
+                    <button onclick="authorizeDevice(${index})">✅ Allow</button>
+                    <button onclick="denyDevice(${index})">❌ Deny</button>
+                </div>`
+            ).join('');
         }
 
-        // Add Device to Authorized List (Avoid Duplicates)
-        function addDevice(device) {
-            let authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
+        // Authorize Device
+        function authorizeDevice(index) {
+            let pendingDevices = getStoredDevices('pendingDevices');
+            let approvedDevices = getStoredDevices('approvedDevices');
 
-            if (!authorizedDevices.includes(device)) {
-                authorizedDevices.push(device);
-                localStorage.setItem('approvedDevices', JSON.stringify(authorizedDevices));
-                alert('✅ Device Authorized Successfully!');
-                updateAuthorizedList();
-            } else {
-                alert('ℹ️ This device is already authorized.');
+            const device = pendingDevices[index];
+            if (!approvedDevices.includes(device)) {
+                approvedDevices.push(device);
+                storeDevices('approvedDevices', approvedDevices);
+                alert(`✅ Device Authorized: ${device}`);
             }
+
+            pendingDevices.splice(index, 1);
+            storeDevices('pendingDevices', pendingDevices);
+            updateDeviceLists();
+            displayPendingDevices();
         }
 
-        // Remove Device from Authorized List
-        function removeDevice(index) {
-            let authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
-            authorizedDevices.splice(index, 1);
-            localStorage.setItem('approvedDevices', JSON.stringify(authorizedDevices));
-            updateAuthorizedList();
+        // Deny Device
+        function denyDevice(index) {
+            let pendingDevices = getStoredDevices('pendingDevices');
+            let deniedDevices = getStoredDevices('deniedDevices');
+
+            const device = pendingDevices[index];
+            if (!deniedDevices.includes(device)) {
+                deniedDevices.push(device);
+                storeDevices('deniedDevices', deniedDevices);
+                alert(`❌ Device Denied: ${device}`);
+            }
+
+            pendingDevices.splice(index, 1);
+            storeDevices('pendingDevices', pendingDevices);
+            updateDeviceLists();
+            displayPendingDevices();
+        }
+
+        // Simulate Device Request from RAVI 3.0 (Example Trigger)
+        function simulateRaviDeviceRequest() {
+            const device = getDeviceIdentifier();
+            requestDeviceAccess(device);
         }
 
         // Initialize Panel
         displayCurrentDevice();
-        updateAuthorizedList();
+        updateDeviceLists();
+        displayPendingDevices();
+
+        // Simulate RAVI 3.0 Device Request
+        setTimeout(simulateRaviDeviceRequest, 3000); // Simulates a request after 3 seconds
     </script>
 
 </body>
