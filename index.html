@@ -7,111 +7,121 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 0;
-            padding: 20px;
+            background-color: #121212;
+            color: white;
             text-align: center;
+            padding-top: 50px;
         }
 
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
         }
 
-        input, button {
-            margin: 10px 0;
-            padding: 8px;
+        input {
+            padding: 10px;
+            margin: 10px;
+            width: 80%;
         }
 
-        .hidden {
-            display: none;
+        .device-info, .authorized-list {
+            margin-top: 20px;
+        }
+
+        .device-entry {
+            margin: 5px 0;
         }
     </style>
 </head>
 
 <body>
+    <h1>Device Authorization Panel</h1>
 
-    <div id="login-container" class="container">
-        <h2>Admin Login</h2>
-        <input type="password" id="password" placeholder="Enter Password">
-        <button onclick="checkPassword()">Login</button>
-    </div>
+    <!-- Current Device Information -->
+    <div class="device-info" id="deviceInfo">Loading your device info...</div>
+    <button onclick="authorizeDevice()">Authorize This Device</button>
 
-    <div id="auth-container" class="container hidden">
-        <h1>Device Authorization Panel</h1>
+    <!-- Manual Device Authorization -->
+    <h2>Add Another Device</h2>
+    <input type="text" id="manualDeviceInput" placeholder="Enter Device Identifier (User-Agent)">
+    <button onclick="authorizeManualDevice()">Authorize Device</button>
 
-        <h3>Add Device</h3>
-        <input type="text" id="newDevice" placeholder="Enter UserAgent">
-        <button onclick="addDevice()">Add Device</button>
-
-        <h3>Allowed Devices:</h3>
-        <ul id="deviceList"></ul>
-
-        <button onclick="logout()">Logout</button>
-    </div>
+    <!-- Authorized Devices List -->
+    <h2>Authorized Devices</h2>
+    <div class="authorized-list" id="authorizedList">No devices authorized yet.</div>
 
     <script>
-        const adminPassword = "RAVI BHAI"; // Password updated to "RAVI BHAI"
+        // Get Current Device Identifier (Simplified for matching)
+        function getDeviceIdentifier() {
+            return `${navigator.platform} | ${navigator.userAgent}`;
+        }
 
-        // Check admin password
-        function checkPassword() {
-            const input = document.getElementById('password').value;
-            if (input === adminPassword) {
-                document.getElementById('login-container').classList.add('hidden');
-                document.getElementById('auth-container').classList.remove('hidden');
-                displayDevices();
+        // Display Current Device Info
+        function displayCurrentDevice() {
+            document.getElementById('deviceInfo').textContent = `Your Device: ${getDeviceIdentifier()}`;
+        }
+
+        // Fetch and Display Authorized Devices
+        function updateAuthorizedList() {
+            const authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
+            const listElement = document.getElementById('authorizedList');
+            
+            if (authorizedDevices.length === 0) {
+                listElement.innerHTML = 'No devices authorized yet.';
             } else {
-                alert('Incorrect password!');
+                listElement.innerHTML = authorizedDevices.map((device, index) =>
+                    `<div class="device-entry">
+                        ${device} 
+                        <button onclick="removeDevice(${index})">❌ Remove</button>
+                    </div>`).join('');
             }
         }
 
-        // Display authorized devices
-        function displayDevices() {
-            const deviceList = document.getElementById('deviceList');
-            deviceList.innerHTML = "";
-            const devices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
-            devices.forEach((device, index) => {
-                const item = document.createElement('li');
-                item.innerHTML = `${device} <button onclick="removeDevice(${index})">Remove</button>`;
-                deviceList.appendChild(item);
-            });
+        // Authorize Current Device
+        function authorizeDevice() {
+            const currentDevice = getDeviceIdentifier();
+            addDevice(currentDevice);
         }
 
-        // Add a new device
-        function addDevice() {
-            const newDevice = document.getElementById('newDevice').value.trim();
-            if (newDevice) {
-                const devices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
-                if (!devices.includes(newDevice)) {
-                    devices.push(newDevice);
-                    localStorage.setItem('approvedDevices', JSON.stringify(devices));
-                    alert('Device added successfully!');
-                    displayDevices();
-                } else {
-                    alert('Device already exists.');
-                }
+        // Authorize Device Manually
+        function authorizeManualDevice() {
+            const manualDevice = document.getElementById('manualDeviceInput').value.trim();
+            if (manualDevice) {
+                addDevice(manualDevice);
+                document.getElementById('manualDeviceInput').value = '';
+            } else {
+                alert('Please enter a valid device identifier.');
             }
         }
 
-        // Remove a device
+        // Add Device to Authorized List (Avoid Duplicates)
+        function addDevice(device) {
+            let authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
+
+            if (!authorizedDevices.includes(device)) {
+                authorizedDevices.push(device);
+                localStorage.setItem('approvedDevices', JSON.stringify(authorizedDevices));
+                alert('✅ Device Authorized Successfully!');
+                updateAuthorizedList();
+            } else {
+                alert('ℹ️ This device is already authorized.');
+            }
+        }
+
+        // Remove Device from Authorized List
         function removeDevice(index) {
-            const devices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
-            devices.splice(index, 1);
-            localStorage.setItem('approvedDevices', JSON.stringify(devices));
-            alert('Device removed successfully!');
-            displayDevices();
+            let authorizedDevices = JSON.parse(localStorage.getItem('approvedDevices')) || [];
+            authorizedDevices.splice(index, 1);
+            localStorage.setItem('approvedDevices', JSON.stringify(authorizedDevices));
+            updateAuthorizedList();
         }
 
-        // Logout
-        function logout() {
-            location.reload();
-        }
+        // Initialize Panel
+        displayCurrentDevice();
+        updateAuthorizedList();
     </script>
 
 </body>
 
-      </html>
+</html>
